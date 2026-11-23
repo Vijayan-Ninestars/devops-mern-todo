@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # MERN Todo (PERN: Postgres + Express + React + Node)
 
 Same structure as `aotm_ams`: `apps/api` (module → controller/service/repository/routes/validators) and `apps/web` (Vite + React + Tailwind + React Query).
@@ -16,3 +17,7 @@ Same structure as `aotm_ams`: `apps/api` (module → controller/service/reposito
 | PUT | /api/todos/:id | update `{title, description?, isDone}` |
 | PATCH | /api/todos/:id/toggle | toggle done |
 | DELETE | /api/todos/:id | delete |
+=======
+# devops-mern-todo
+This project is learning puporse of devops with mern stack
+>>>>>>> 92b4d46eb0ddf99c65217df6d1cb6a49d87ba7e9
