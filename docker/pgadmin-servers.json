@@ -1,0 +1,13 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "todo_db (docker)",
+      "Group": "Servers",
+      "Host": "db",
+      "Port": 5432,
+      "MaintenanceDB": "todo_db",
+      "Username": "postgres",
+      "SSLMode": "prefer"
+    }
+  }
+}
