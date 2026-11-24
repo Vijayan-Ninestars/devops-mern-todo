@@ -14,7 +14,7 @@ export default function TodoPage() {
 	return (
 		<div className="mx-auto max-w-xl space-y-4 px-4 py-10">
 			<header>
-				<h1 className="text-2xl font-bold">Todo List</h1>
+				<h1 className="text-2xl font-bold">Todo List New</h1>
 				<p className="text-sm text-content-secondary">
 					{doneCount} of {todos.length} completed
 				</p>
