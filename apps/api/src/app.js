@@ -10,7 +10,16 @@ const routes = require('./routes');
 
 const app = express();
 
-app.use(helmet());
+// The app is served over plain HTTP (http://IP:5000). Helmet's defaults would force
+// every asset request to https:// (upgrade-insecure-requests) and add HSTS, which
+// leaves a blank page when the server has no TLS. Remove both; put the site behind
+// an HTTPS proxy (e.g. Caddy/Nginx) later and re-enable them.
+app.use(
+	helmet({
+		contentSecurityPolicy: { useDefaults: true, directives: { 'upgrade-insecure-requests': null } },
+		hsts: false,
+	})
+);
 app.use(compression());
 app.use(express.json({ limit: '1mb' }));
 app.use(morgan('dev'));
