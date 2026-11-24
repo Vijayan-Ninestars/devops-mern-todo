@@ -7,7 +7,7 @@ Same structure as `aotm_ams`: `apps/api` (module → controller/service/reposito
 1. Create the DB and run `database/schema.sql` (or `docker compose up db`).
 2. `copy apps\api\.env.example apps\api\.env`
 3. `npm run install:all`
-4. `npm run dev` → web http://localhost:5173, API http://localhost:8000
+4. `npm run dev` → web http://localhost:5173, API http://localhost:5000
 
 ## API
 | Method | Path | |

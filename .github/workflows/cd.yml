@@ -1,0 +1,130 @@
+name: CD
+
+# Runs after CI succeeds on main (or manually from the Actions tab).
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  DEPLOY_DIR: /opt/todo
+
+jobs:
+  build-and-push:
+    name: Build & push image
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      owner: ${{ steps.meta.outputs.owner }}
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - id: meta
+        run: |
+          echo "owner=${GITHUB_REPOSITORY_OWNER,,}" >> "$GITHUB_OUTPUT"
+          echo "tag=$(git rev-parse --short=12 HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # One image: Node serves the API and the built React app (root Dockerfile).
+      - name: Push app image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/todo-app:${{ steps.meta.outputs.tag }}
+            ${{ env.REGISTRY }}/${{ steps.meta.outputs.owner }}/todo-app:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    name: Deploy to server
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Set up SSH
+        run: |
+          install -m 700 -d ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
+
+      - name: Copy compose file and schema
+        run: |
+          SSH="ssh -i ~/.ssh/deploy_key ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}"
+          $SSH "mkdir -p ${{ env.DEPLOY_DIR }}/database"
+          scp -i ~/.ssh/deploy_key docker-compose.prod.yml \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ env.DEPLOY_DIR }}/docker-compose.yml
+          scp -i ~/.ssh/deploy_key database/schema.sql \
+            ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:${{ env.DEPLOY_DIR }}/database/schema.sql
+
+      # Generates the single backend env file (/opt/todo/.env) from secrets/variables.
+      - name: Write backend .env and deploy
+        env:
+          OWNER: ${{ needs.build-and-push.outputs.owner }}
+          TAG: ${{ needs.build-and-push.outputs.tag }}
+          PORT: ${{ vars.PORT || '5000' }}
+          DB_USER: ${{ secrets.DB_USER || 'postgres' }}
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
+          DB_NAME: ${{ vars.DB_NAME || 'todo_db' }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ssh -i ~/.ssh/deploy_key ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "OWNER='$OWNER' TAG='$TAG' PORT='$PORT' DB_USER='$DB_USER' DB_PASSWORD='$DB_PASSWORD' DB_NAME='$DB_NAME' GHCR_USER='$GHCR_USER' GHCR_TOKEN='$GHCR_TOKEN' DEPLOY_DIR='${{ env.DEPLOY_DIR }}' bash -s" <<'REMOTE'
+          set -euo pipefail
+          cd "$DEPLOY_DIR"
+          umask 077
+          cat > .env <<EOF
+          NODE_ENV=production
+          PORT=$PORT
+          DB_HOST=db
+          DB_PORT=5432
+          DB_USER=$DB_USER
+          DB_PASSWORD=$DB_PASSWORD
+          DB_NAME=$DB_NAME
+          GHCR_OWNER=$OWNER
+          IMAGE_TAG=$TAG
+          EOF
+          echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+          docker compose pull
+          docker compose up -d --remove-orphans
+          docker logout ghcr.io
+          docker image prune -f
+          REMOTE
+
+      - name: Health check
+        run: |
+          for i in $(seq 1 12); do
+            if curl -fsS "http://${{ secrets.SSH_HOST }}:${{ vars.PORT || '5000' }}/health" > /dev/null; then
+              echo "Deployed OK"; exit 0
+            fi
+            echo "Waiting for app ($i/12)..."; sleep 5
+          done
+          echo "Health check failed"; exit 1

@@ -1,0 +1,40 @@
+# Production stack: Postgres + one Node container (API + frontend).
+# All configuration comes from the single backend env file (.env) on the server.
+services:
+  db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Runs only the first time the volume is created.
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    # No published ports: reachable only from the app container.
+
+  app:
+    image: ghcr.io/${GHCR_OWNER}/todo-app:${IMAGE_TAG:-latest}
+    restart: always
+    env_file: .env
+    environment:
+      DB_HOST: db # container network hostname, overrides .env
+    ports:
+      - "${PORT:-5000}:${PORT:-5000}"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:${PORT:-5000}/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:

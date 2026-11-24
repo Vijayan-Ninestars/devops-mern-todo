@@ -2,18 +2,15 @@ require('express-async-errors');
 const path = require('path');
 const express = require('express');
 const helmet = require('helmet');
-const cors = require('cors');
 const compression = require('compression');
 const morgan = require('morgan');
 
-const env = require('./config/env');
 const { notFoundHandler, errorHandler } = require('./middleware/errorHandler');
 const routes = require('./routes');
 
 const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: env.clientUrl, credentials: true }));
 app.use(compression());
 app.use(express.json({ limit: '1mb' }));
 app.use(morgan('dev'));
