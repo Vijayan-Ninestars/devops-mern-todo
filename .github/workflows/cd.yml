@@ -96,6 +96,10 @@ jobs:
           GHCR_USER: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          if [ -z "$DB_PASSWORD" ]; then
+            echo "::error::DB_PASSWORD secret is empty or missing. Add it under Settings > Secrets and variables > Actions (repository secret or the 'production' environment)."
+            exit 1
+          fi
           ssh -i ~/.ssh/deploy_key ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
             "OWNER='$OWNER' TAG='$TAG' PORT='$PORT' DB_USER='$DB_USER' DB_PASSWORD='$DB_PASSWORD' DB_NAME='$DB_NAME' GHCR_USER='$GHCR_USER' GHCR_TOKEN='$GHCR_TOKEN' DEPLOY_DIR='${{ env.DEPLOY_DIR }}' bash -s" <<'REMOTE'
           set -euo pipefail
