@@ -20,7 +20,9 @@ services:
     # No published ports: reachable only from the app container.
 
   app:
-    image: ghcr.io/${GHCR_OWNER}/todo-app:${IMAGE_TAG:-latest}
+    # CD pulls this image from GHCR; on a server with the repo cloned, `--build` builds it locally.
+    build: .
+    image: ghcr.io/${GHCR_OWNER:-local}/todo-app:${IMAGE_TAG:-latest}
     restart: always
     env_file: .env
     environment:
