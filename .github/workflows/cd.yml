@@ -89,10 +89,10 @@ jobs:
         env:
           OWNER: ${{ needs.build-and-push.outputs.owner }}
           TAG: ${{ needs.build-and-push.outputs.tag }}
-          PORT: ${{ vars.PORT || '5000' }}
-          DB_USER: ${{ secrets.DB_USER || 'postgres' }}
+          PORT: ${{ vars.PORT }}
+          DB_USER: ${{ secrets.DB_USER}}
           DB_PASSWORD: ${{ secrets.DB_PASSWORD }}
-          DB_NAME: ${{ vars.DB_NAME || 'todo_db' }}
+          DB_NAME: ${{ vars.DB_NAME }}
           GHCR_USER: ${{ github.actor }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
